@@ -1,12 +1,45 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
 export default function LoginPage() {
+  const supabase = createClient();
+
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setLoading(true);
+
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "");
+    const password = String(form.get("password") || "");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+console.log("LOGIN ERROR:", error);
+
+    setLoading(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    window.location.href = "/dashboard";
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <div className="mx-auto max-w-md">
         <div className="mb-10 text-center">
-          <a
-            href="/"
-            className="text-3xl font-bold text-yellow-400"
-          >
+          <a href="/" className="text-3xl font-bold text-yellow-400">
             B-Rock
           </a>
 
@@ -15,11 +48,14 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-3 text-white/60">
-            Sign in to access your B-Rock account.
+            Sign in to your B-Rock account.
           </p>
         </div>
 
-        <form className="space-y-5 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
+        <form
+          onSubmit={handleLogin}
+          className="space-y-5 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl"
+        >
           <div>
             <label
               htmlFor="email"
@@ -39,45 +75,35 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-white/80"
-              >
-                Password
-              </label>
-
-              <a
-                href="#"
-                className="text-sm text-yellow-400 hover:text-yellow-300"
-              >
-                Forgot password?
-              </a>
-            </div>
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Password
+            </label>
 
             <input
               id="password"
               name="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="Your password"
               required
               className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400"
             />
           </div>
 
-          <label className="flex items-center gap-3 text-sm text-white/60">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-            />
-            Remember me
-          </label>
+          {message && (
+            <p className="rounded-lg border border-white/10 bg-slate-900 p-3 text-sm text-white/70">
+              {message}
+            </p>
+          )}
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-yellow-400 px-5 py-3 font-bold text-slate-950 transition hover:bg-yellow-300"
+            disabled={loading}
+            className="w-full rounded-lg bg-yellow-400 px-5 py-3 font-bold text-slate-950 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Login
+            {loading ? "Signing in..." : "Sign In"}
           </button>
 
           <p className="text-center text-sm text-white/60">
@@ -86,7 +112,7 @@ export default function LoginPage() {
               href="/register"
               className="font-semibold text-yellow-400 hover:text-yellow-300"
             >
-              Create an account
+              Create Account
             </a>
           </p>
         </form>
