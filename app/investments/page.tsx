@@ -25,11 +25,11 @@ export default async function InvestmentsPage() {
           </a>
 
           <h1 className="mt-12 text-4xl font-bold">
-            Investment Opportunities
+            B-Rock Investment Plans
           </h1>
 
           <p className="mt-4 text-red-400">
-            Unable to load the current opportunities.
+            Unable to load the current investment plans.
           </p>
         </div>
       </main>
@@ -68,17 +68,16 @@ export default async function InvestmentsPage() {
       <section className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-400">
-            B-Rock Opportunities
+            B-Rock Investment Plans
           </p>
 
           <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">
-            Explore investment opportunities.
+            Choose Your Investment Plan
           </h1>
 
           <p className="mt-5 text-lg leading-8 text-white/60">
-            Review the opportunities currently displayed on B-Rock,
-            including their stated investment ranges and durations.
-            Select an opportunity to review its terms before proceeding.
+            Explore B-Rock's investment plans and select the level that
+            matches your preferred investment amount and timeframe.
           </p>
         </div>
 
@@ -89,7 +88,7 @@ export default async function InvestmentsPage() {
             </p>
 
             <p className="mt-1 text-sm text-white/60">
-              You can explore the opportunities below without signing in.
+              You can explore the investment plans below without signing in.
               An account is required before submitting an investment request.
             </p>
 
@@ -111,7 +110,7 @@ export default async function InvestmentsPage() {
               >
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-widest text-yellow-400">
-                    Opportunity
+                    Investment Plan
                   </span>
 
                   <h2 className="mt-3 text-2xl font-bold">
@@ -120,14 +119,14 @@ export default async function InvestmentsPage() {
 
                   <p className="mt-3 min-h-20 text-sm leading-6 text-white/55">
                     {plan.description ||
-                      "Review the stated terms and information for this opportunity."}
+                      "An investment plan designed to provide access to the B-Rock investment platform."}
                   </p>
                 </div>
 
                 <div className="mt-7 space-y-4 border-t border-white/10 pt-6">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-white/40">
-                      Investment range
+                      Investment Range
                     </p>
 
                     <p className="mt-1 text-lg font-semibold">
@@ -135,7 +134,7 @@ export default async function InvestmentsPage() {
                       {" – "}
                       {plan.max_amount
                         ? `$${Number(plan.max_amount).toLocaleString("en-US")}`
-                        : "No maximum stated"}
+                        : "Unlimited"}
                     </p>
                   </div>
 
@@ -153,7 +152,7 @@ export default async function InvestmentsPage() {
 
                   <div>
                     <p className="text-xs uppercase tracking-wide text-white/40">
-                      Displayed performance
+                      Displayed Performance
                     </p>
 
                     <p className="mt-1 font-medium text-yellow-400">
@@ -196,13 +195,10 @@ export default async function InvestmentsPage() {
                       }
 
                       const { error: requestError } =
-                        await client.rpc(
-                          "create_investment_request",
-                          {
-                            p_plan_id: plan.id,
-                            p_amount: amount,
-                          }
-                        );
+                        await client.rpc("create_investment_request", {
+                          p_plan_id: plan.id,
+                          p_amount: amount,
+                        });
 
                       if (requestError) {
                         throw new Error(requestError.message);
@@ -216,7 +212,7 @@ export default async function InvestmentsPage() {
                       htmlFor={`amount-${plan.id}`}
                       className="mb-2 block text-sm text-white/60"
                     >
-                      Amount
+                      Investment Amount
                     </label>
 
                     <input
@@ -235,7 +231,7 @@ export default async function InvestmentsPage() {
                       type="submit"
                       className="mt-4 w-full rounded-lg bg-yellow-400 px-5 py-3 font-bold text-slate-950 hover:bg-yellow-300"
                     >
-                      Request Investment
+                      Invest Now
                     </button>
                   </form>
                 ) : (
@@ -252,58 +248,14 @@ export default async function InvestmentsPage() {
         ) : (
           <div className="mt-12 rounded-2xl border border-white/10 bg-white/[0.04] p-8">
             <h2 className="text-xl font-bold">
-              Opportunities coming soon
+              Investment Plans Coming Soon
             </h2>
 
             <p className="mt-3 text-white/50">
-              No active investment opportunities are currently displayed.
+              No active investment plans are currently displayed.
             </p>
           </div>
         )}
-
-        <div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-7">
-          <h2 className="text-xl font-bold">
-            Before you proceed
-          </h2>
-
-          <p className="mt-3 text-sm leading-6 text-white/50">
-            Investment products can involve financial risk. Review the
-            applicable product information, fees, terms, legal information,
-            and risk disclosures before making any real-money investment.
-            Any displayed performance information should not be treated as
-            a guarantee of future results.
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-5 text-sm">
-            <a
-              href="/fees"
-              className="text-yellow-400 hover:text-yellow-300"
-            >
-              Fees & Pricing
-            </a>
-
-            <a
-              href="/risk-disclosure"
-              className="text-yellow-400 hover:text-yellow-300"
-            >
-              Risk Disclosure
-            </a>
-
-            <a
-              href="/legal"
-              className="text-yellow-400 hover:text-yellow-300"
-            >
-              Legal & Regulatory
-            </a>
-
-            <a
-              href="/client-funds"
-              className="text-yellow-400 hover:text-yellow-300"
-            >
-              Client Funds
-            </a>
-          </div>
-        </div>
       </section>
     </main>
   );
