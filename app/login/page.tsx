@@ -1,4 +1,5 @@
 "use client";
+import CoinTicker from "../components/CoinTicker";
 
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";

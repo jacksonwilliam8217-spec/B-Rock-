@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import WalletDepositSection from "@/components/WalletDepositSection";
 import LiveProfit from "./components/LiveProfit";
+import { notifyInvestmentCompleted } from "@/lib/notifications/investment-completion";
 
 function money(value: number) {
   return `$${value.toLocaleString("en-US", {
@@ -60,9 +62,28 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, email, role")
+    .select("id, username, email, role, referral_code, rewards_balance")
     .eq("id", user.id)
     .maybeSingle();
+
+  const { data: referrals } = await supabase
+    .from("profiles")
+    .select(
+      "id, username, full_name, email, account_status, kyc_status, created_at"
+    )
+    .eq("referred_by", user.id)
+    .order("created_at", { ascending: false });
+
+  const { data: referralRewards } = await supabase
+    .from("referral_rewards")
+    .select(
+      "id, downline_id, amount, created_at"
+    )
+    .eq("referrer_id", user.id)
+    .order("created_at", { ascending: false });
+
+  const userReferrals = referrals ?? [];
+  const userReferralRewards = referralRewards ?? [];
 
   const {
     data: investments,
@@ -130,21 +151,37 @@ export default async function DashboardPage() {
     const endTime =
       startedAt + durationMilliseconds;
 
-    if (now >= endTime) {
-      await supabase
-        .from("user_investments")
-        .update({
-          status: "completed",
-        })
-        .eq("id", investment.id)
-        .eq("user_id", user.id)
-        .eq("status", "active");
-    }
-  }
+if (now >= endTime) {
+  const { error: completionError } = await supabase
+    .from("user_investments")
+    .update({
+      status: "completed",
+    })
+    .eq("id", investment.id)
+    .eq("user_id", user.id)
+    .eq("status", "active");
 
-  /*
-   * Re-fetch investments after automatic completion.
-   */
+  if (!completionError) {
+    try {
+      await notifyInvestmentCompleted(investment.id);
+    } catch (notificationError) {
+      console.error(
+        "Investment completion notification failed:",
+        notificationError
+      );
+    }
+  } else {
+    console.error(
+      "Investment completion failed:",
+      completionError
+    );
+  }
+  } // closes if (now >= endTime)
+} // closes for loop
+
+/*
+ * Re-fetch investments after automatic completion.
+ */
   const {
     data: refreshedInvestments,
     error: refreshedInvestmentsError,
@@ -179,6 +216,11 @@ export default async function DashboardPage() {
   const finalInvestments =
     refreshedInvestments ?? investments ?? [];
 
+  const { data: withdrawals } = await supabase
+    .from("withdrawals")
+    .select("amount, status")
+    .eq("user_id", user.id);
+
   const { count: unreadMessages } = await supabase
     .from("messages")
     .select("id", {
@@ -201,6 +243,17 @@ export default async function DashboardPage() {
       ascending: false,
     });
 
+  const totalDeposit = (deposits ?? []).reduce(
+    (total, deposit) => total + Number(deposit.amount || 0),
+    0
+  );
+
+  const totalWithdrawal = (withdrawals ?? [])
+    .filter((withdrawal) => withdrawal.status === "completed")
+    .reduce(
+      (total, withdrawal) => total + Number(withdrawal.amount || 0),
+      0
+    );
   const safeInvestments = finalInvestments;
 
   const activeInvestments =
@@ -213,7 +266,9 @@ export default async function DashboardPage() {
   safeInvestments.filter(
     (investment) =>
       investment.status === "completed"
-  );const pendingInvestments =
+  );
+
+const pendingInvestments =
     safeInvestments.filter(
       (investment) =>
         investment.status === "pending"
@@ -536,6 +591,172 @@ export default async function DashboardPage() {
         )}
 
         <section className="mt-10">
+          <div className="rounded-2xl border border-yellow-400/20 bg-white/5 p-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-yellow-400">
+                  Referral Program
+                </p>
+
+                <h2 className="mt-1 text-2xl font-bold">
+                  Refer & Earn
+                </h2>
+
+                <p className="mt-2 text-sm text-white/50">
+                  Share your referral link and earn rewards when your
+                  referred users make their first qualifying deposit.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3">
+                <p className="text-xs text-white/50">
+                  Rewards Balance
+                </p>
+
+                <p className="mt-1 text-xl font-bold text-yellow-400">
+                  {money(Number(profile?.rewards_balance || 0))}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <p className="mb-2 text-sm font-medium text-white/70">
+                Your Referral Link
+              </p>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  readOnly
+                  value={
+                    profile?.referral_code
+                      ? `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/register?ref=${profile.referral_code}`
+                      : ""
+                  }
+                  className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white outline-none"
+                />
+
+                <a
+                  href={
+                    profile?.referral_code
+                      ? `/register?ref=${profile.referral_code}`
+                      : "#"
+                  }
+                  className="rounded-lg bg-yellow-400 px-5 py-3 text-center text-sm font-bold text-slate-950 transition hover:bg-yellow-300"
+                >
+                  Open Referral Link
+                </a>
+              </div>
+
+              <p className="mt-2 text-xs text-white/40">
+                Referral Code: {profile?.referral_code || "Not available"}
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
+                <p className="text-sm text-white/50">
+                  Total Referrals
+                </p>
+
+                <p className="mt-1 text-2xl font-bold">
+                  {userReferrals.length}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
+                <p className="text-sm text-white/50">
+                  Rewards Earned
+                </p>
+
+                <p className="mt-1 text-2xl font-bold text-yellow-400">
+                  {money(
+                    userReferralRewards.reduce(
+                      (total, reward) =>
+                        total + Number(reward.amount || 0),
+                      0
+                    )
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <h3 className="text-lg font-bold">
+                Your Referrals
+              </h3>
+
+              {userReferrals.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-900 p-5 text-sm text-white/50">
+                  No referrals yet.
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {userReferrals.map((referral) => (
+                    <div
+                      key={referral.id}
+                      className="flex flex-col gap-3 rounded-xl border border-white/10 bg-slate-900 p-4 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold">
+                          {referral.username || "User"}
+                        </p>
+
+                        <p className="mt-1 text-sm text-white/40">
+                          {referral.full_name || "No full name"}
+                        </p>
+                      </div>
+
+                      <div className="text-left md:text-right">
+                        <p className="text-xs text-white/40">
+                          Status
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold capitalize">
+                          {referral.account_status || "pending"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {userReferralRewards.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-bold">
+                  Referral Rewards
+                </h3>
+
+                <div className="mt-4 space-y-3">
+                  {userReferralRewards.map((reward) => (
+                    <div
+                      key={reward.id}
+                      className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900 p-4"
+                    >
+                      <div>
+                        <p className="text-sm text-white/50">
+                          Referral Reward
+                        </p>
+
+                        <p className="mt-1 text-xs text-white/30">
+                          {new Date(
+                            reward.created_at
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+
+                      <p className="font-bold text-green-400">
+                        +{money(Number(reward.amount || 0))}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>       
+
+ <section className="mt-10">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-2xl font-bold">
               Deposit History
@@ -609,6 +830,17 @@ export default async function DashboardPage() {
           </div>
         </section>
       </section>
+        <a href="/mt5" className="mb-8 block rounded-2xl border border-white/10 bg-white/5 p-6 transition hover:border-yellow-400/50 hover:bg-white/10">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-yellow-400">Forex Trading</p>
+              <h2 className="mt-2 text-xl font-bold text-white">MetaTrader 5</h2>
+              <p className="mt-2 text-sm text-white/60">Connect your MT5 account and view your trading information.</p>
+            </div>
+            <span className="shrink-0 rounded-lg bg-yellow-400 px-4 py-2 text-sm font-bold text-slate-950">Open MT5 →</span>
+          </div>
+        </a>
+        <WalletDepositSection />
     </main>
   );
 }

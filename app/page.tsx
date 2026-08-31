@@ -1,3 +1,5 @@
+import CoinTicker from "./components/CoinTicker";
+import LiveBlockchainActivity from "./components/LiveBlockchainActivity";
 export default function Home() {
   const opportunities = [
     {
@@ -114,6 +116,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <CoinTicker />
       {/* NAVIGATION */}
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
@@ -238,7 +241,7 @@ export default function Home() {
           <div className="relative">
             <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl shadow-black/40">
               <img
-                src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1400&q=90"
+                src="/images/brock-hero.jpg"
                 alt="Investment portfolio analytics dashboard"
                 className="h-[420px] w-full object-cover"
               />
@@ -444,25 +447,25 @@ export default function Home() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <img
-              src="https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=900&q=85"
+              src="/images/financial-markets.jpg"
               alt="Global financial markets"
               className="h-64 w-full rounded-2xl object-cover"
             />
 
             <img
-              src="https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=900&q=85"
+              src="/images/financial-analysis.jpg"
               alt="Financial planning and analysis"
               className="h-64 w-full rounded-2xl object-cover"
             />
 
             <img
-              src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=900&q=85"
+              src="/images/professional-meeting.jpg"
               alt="Professional business meeting"
               className="h-64 w-full rounded-2xl object-cover"
             />
 
             <img
-              src="https://images.unsplash.com/photo-1518544866330-95a2e7aab1f4?auto=format&fit=crop&w=900&q=85"
+              src="/images/financial-markets.jpg"
               alt="Digital finance and technology"
               className="h-64 w-full rounded-2xl object-cover"
             />
@@ -470,6 +473,7 @@ export default function Home() {
         </div>
       </section>
 
+      <LiveBlockchainActivity />
       {/* MARKET ACCESS */}
       <section className="border-y border-white/10 bg-slate-900/50">
         <div className="mx-auto max-w-7xl px-5 py-20 lg:px-8">

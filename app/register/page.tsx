@@ -1,10 +1,14 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function RegisterPage() {
+  function RegisterForm() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const urlReferralCode =
+    searchParams.get("ref")?.trim().toUpperCase() || "";
 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,40 +16,129 @@ export default function RegisterPage() {
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    setLoading(true);
 
     const form = new FormData(event.currentTarget);
 
-    const fullName = String(form.get("fullName") || "");
-    const email = String(form.get("email") || "");
+    const username = String(form.get("username") || "").trim();
+    const fullName = String(form.get("fullName") || "").trim();
+    const contact = String(form.get("contact") || "").trim();
+    const email = String(form.get("email") || "").trim();
+    const country = String(form.get("country") || "").trim();
+    const dateOfBirth = String(form.get("dateOfBirth") || "");
     const password = String(form.get("password") || "");
     const confirmPassword = String(form.get("confirmPassword") || "");
+    const referralCode =
+      String(form.get("referralCode") || "").trim().toUpperCase() ||
+      urlReferralCode;
 
     if (password !== confirmPassword) {
       setMessage("Passwords do not match.");
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
+    let referredBy: string | null = null;
 
-    const { error } = await supabase.auth.signUp({
+    if (referralCode) {
+      const { data: referrerId, error: referralError } =
+        await supabase.rpc("get_referrer_id", {
+          p_referral_code: referralCode,
+        });
+
+      if (referralError) {
+        setMessage("Unable to validate the referral code.");
+        setLoading(false);
+        return;
+      }
+
+      if (!referrerId) {
+        setMessage("Invalid referral code.");
+        setLoading(false);
+        return;
+      }
+
+      referredBy = referrerId;
+    }
+
+    if (username.length < 3) {
+      setMessage("Username must be at least 3 characters.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: existingUsername, error: usernameCheckError } =
+      await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", username)
+        .maybeSingle();
+
+    if (usernameCheckError) {
+      setMessage("Unable to check username availability.");
+      setLoading(false);
+      return;
+    }
+
+    if (existingUsername) {
+      setMessage("That username is already taken.");
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
+          username,
           full_name: fullName,
+          contact,
+          country,
+          date_of_birth: dateOfBirth,
         },
       },
     });
 
-    setLoading(false);
-
     if (error) {
       setMessage(error.message);
+      setLoading(false);
       return;
     }
 
+    if (data.user) {
+      const generatedReferralCode = `BR${data.user.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: data.user.id,
+            username,
+            full_name: fullName,
+            email,
+            contact,
+            country,
+            date_of_birth: dateOfBirth || null,
+            referral_code: generatedReferralCode,
+            referred_by: referredBy,
+          },
+          { onConflict: "id" }
+        );
+
+      if (profileError) {
+        setMessage(
+          "Account was created, but your profile could not be completed."
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
+    setLoading(false);
+
     setMessage(
-      "Account created. Check your email if email confirmation is enabled."
+      "Account created successfully. Check your email if email confirmation is enabled."
     );
   }
 
@@ -72,6 +165,24 @@ export default function RegisterPage() {
         >
           <div>
             <label
+              htmlFor="username"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Username
+            </label>
+
+            <input
+              id="username"
+              name="username"
+              type="text"
+              required
+              minLength={3}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
+            />
+          </div>
+
+          <div>
+            <label
               htmlFor="fullName"
               className="mb-2 block text-sm font-medium text-white/80"
             >
@@ -82,9 +193,25 @@ export default function RegisterPage() {
               id="fullName"
               name="fullName"
               type="text"
-              placeholder="Enter your full name"
               required
-              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400"
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="contact"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Contact
+            </label>
+
+            <input
+              id="contact"
+              name="contact"
+              type="tel"
+              required
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
             />
           </div>
 
@@ -100,10 +227,64 @@ export default function RegisterPage() {
               id="email"
               name="email"
               type="email"
-              placeholder="you@example.com"
               required
-              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400"
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="country"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Country
+            </label>
+
+            <input
+              id="country"
+              name="country"
+              type="text"
+              required
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="dateOfBirth"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Date of birth
+            </label>
+
+            <input
+              id="dateOfBirth"
+              name="dateOfBirth"
+              type="date"
+              required
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="referralCode"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Referral Code (Optional)
+            </label>
+
+            <input
+              id="referralCode"
+              name="referralCode"
+              type="text"
+              placeholder="Enter referral code"
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white uppercase outline-none focus:border-yellow-400"
+            />
+
+            <p className="mt-2 text-xs text-white/40">
+              If someone referred you, enter their referral code here.
+            </p>
           </div>
 
           <div>
@@ -118,10 +299,9 @@ export default function RegisterPage() {
               id="password"
               name="password"
               type="password"
-              placeholder="Create a password"
               required
               minLength={8}
-              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400"
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
             />
           </div>
 
@@ -137,16 +317,14 @@ export default function RegisterPage() {
               id="confirmPassword"
               name="confirmPassword"
               type="password"
-              placeholder="Confirm your password"
               required
               minLength={8}
-              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400"
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-yellow-400"
             />
           </div>
 
           <label className="flex items-start gap-3 text-sm text-white/60">
             <input type="checkbox" required className="mt-1" />
-
             <span>
               I agree to the B-Rock terms and conditions and privacy policy.
             </span>
@@ -187,5 +365,21 @@ export default function RegisterPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+          <div className="mx-auto max-w-md text-center">
+            <p className="text-white/60">Loading registration...</p>
+          </div>
+        </main>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

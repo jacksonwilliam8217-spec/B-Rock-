@@ -18,9 +18,9 @@ export default async function AdminWithdrawalsPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profile?.role !== "admin") {
-    redirect("/dashboard");
-  }
+if (profile?.role !== "admin" && profile?.role !== "super_admin") {
+  redirect("/dashboard");
+}
 
   const { data: withdrawals, error } = await supabase
     .from("withdrawals")

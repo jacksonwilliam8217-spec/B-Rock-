@@ -48,6 +48,32 @@ export default async function WithdrawalsPage() {
       formData.get("payment_details") || ""
     ).trim();
 
+    const { data: kycEnabled, error: kycSettingError } =
+      await client.rpc("get_kyc_enabled");
+
+    if (kycSettingError) {
+      throw new Error(kycSettingError.message);
+    }
+
+    if (kycEnabled) {
+      const { data: kycProfile, error: kycProfileError } =
+        await client
+          .from("profiles")
+          .select("kyc_status")
+                    .eq("id", currentUser.id)
+          .maybeSingle();
+
+      if (kycProfileError) {
+        throw new Error(kycProfileError.message);
+      }
+
+      if (kycProfile?.kyc_status !== "verified") {
+        throw new Error(
+          "KYC verification is required before you can submit a withdrawal."
+        );
+      }
+    }
+
     if (!methodId) {
       throw new Error("Please select a withdrawal method.");
     }
