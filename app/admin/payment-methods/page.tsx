@@ -18,7 +18,7 @@ export default async function PaymentMethodsPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || !["admin", "super_admin"].includes(profile.role)) {
     redirect("/dashboard");
   }
 
@@ -60,7 +60,7 @@ export default async function PaymentMethodsPage() {
       .eq("id", adminUser.id)
       .maybeSingle();
 
-    if (!adminProfile || adminProfile.role !== "admin") {
+    if (!adminProfile || !["admin", "super_admin"].includes(adminProfile.role)) {
       throw new Error("Administrator access required.");
     }
 

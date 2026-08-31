@@ -72,6 +72,13 @@ export default async function AdminDashboardPage() {
             </a>
 
             <a
+              href="/admin/front-page"
+              className="mb-2 flex items-center rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white"
+            >
+              Front Page Editor
+            </a>
+
+            <a
               href="/admin/users"
               className="mb-2 flex items-center rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white"
             >
@@ -241,6 +248,19 @@ export default async function AdminDashboardPage() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <a
+                href="/admin/front-page"
+                className="group rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-6 transition hover:border-yellow-400/50 hover:bg-yellow-400/10"
+              >
+                <h3 className="text-lg font-bold text-yellow-400">
+                  Front Page Editor
+                </h3>
+
+                <p className="mt-2 text-sm text-white/50">
+                  Edit the public B-Rock homepage, hero section, market
+                  section and calls to action.
+                </p>
+              </a>
                 <a
                   href="/admin/users"
                   className="group rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-yellow-400/40 hover:bg-white/[0.06]"

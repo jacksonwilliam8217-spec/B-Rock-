@@ -10,149 +10,148 @@ type WalletProvider = {
   }) => Promise<unknown>;
 };
 
+type Eip6963ProviderDetail = {
+  info: {
+    uuid: string;
+    name: string;
+    icon: string;
+    rdns: string;
+  };
+  provider: WalletProvider;
+};
+
 declare global {
   interface Window {
     ethereum?: WalletProvider;
   }
 }
 
-type CryptoOption = {
+type PaymentMethod = {
   id: string;
   name: string;
-  network: string;
-  symbol: string;
-  address: string;
+  type: string;
+  asset: string | null;
+  network: string | null;
+  wallet_address: string | null;
+  payment_details: string | null;
+  instructions: string | null;
+  min_amount: number | null;
+  max_amount: number | null;
+  confirmation_required: boolean;
+  is_active: boolean;
+  display_order: number;
 };
-
-const cryptoOptions: CryptoOption[] = [
-  {
-    id: "btc",
-    name: "Bitcoin",
-    network: "Bitcoin",
-    symbol: "BTC",
-    address:
-      "bc1qwnjx26qkxpd6zcmmc6y3yaxu00l7kdtjd3z8pr",
-  },
-  {
-    id: "lightning",
-    name: "Bitcoin Lightning",
-    network: "Lightning",
-    symbol: "BTC",
-    address:
-      "femininesociology9268@cake.cash",
-  },
-  {
-    id: "xmr",
-    name: "Monero",
-    network: "Monero",
-    symbol: "XMR",
-    address:
-      "8BqqN66J1ejBhDtzawYPFuNZbj7Fn9XHs7jsJ9NsSYbfhjxkubwnjuPEjXT1j1bDPcDXasF1VTMQdJsNT9RFsfxgQ49X3QS",
-  },
-  {
-    id: "zec",
-    name: "Zcash",
-    network: "Zcash",
-    symbol: "ZEC",
-    address:
-      "u1fcz8m2qk45fh09jgczdq7k52v4myv5d7mg2wjsn9gutmajpdcvyth8333waqhls0zkzwm6cl36as4w0yt4fzfdmm0wn44uq6xv6rfgus",
-  },
-  {
-    id: "base-eth",
-    name: "Ethereum",
-    network: "Base",
-    symbol: "ETH",
-    address:
-      "0xD9961287d13De45B2F32c73d2925D5286de2332C",
-  },
-  {
-    id: "base-usdc",
-    name: "USD Coin",
-    network: "Base",
-    symbol: "USDC",
-    address:
-      "0xD9961287d13De45B2F32c73d2925D5286de2332C",
-  },
-  {
-    id: "base-usdt",
-    name: "Tether USD",
-    network: "Base",
-    symbol: "USDT",
-    address:
-      "0xD9961287d13De45B2F32c73d2925D5286de2332C",
-  },
-  {
-    id: "tron-trx",
-    name: "TRON",
-    network: "TRON",
-    symbol: "TRX",
-    address:
-      "TUqSumPbK1ENbzMmqs7CxH1TWrBYuc8fQk",
-  },
-  {
-    id: "tron-usdt",
-    name: "Tether USD",
-    network: "TRON",
-    symbol: "USDT",
-    address:
-      "TUqSumPbK1ENbzMmqs7CxH1TWrBYuc8fQk",
-  },
-];
-
-const wallets = [
-  "MetaMask",
-  "Bitget Wallet",
-  "Trust Wallet",
-  "Coinbase Wallet",
-  "Phantom",
-  "OKX Wallet",
-  "Exodus",
-  "WalletConnect",
-];
 
 export default function WalletDepositSection() {
   const supabase = createClient();
 
   const [walletAddress, setWalletAddress] = useState("");
   const [walletNetwork, setWalletNetwork] = useState("");
-  const [selectedCrypto, setSelectedCrypto] = useState(
-    cryptoOptions[0]
-  );
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedMethod, setSelectedMethod] =
+    useState<PaymentMethod | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [loadingMethods, setLoadingMethods] = useState(true);
   const [message, setMessage] = useState("");
+  const [provider, setProvider] = useState<WalletProvider | null>(null);
 
   useEffect(() => {
-    async function loadWallet() {
+    async function loadData() {
+      setLoadingMethods(true);
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("wallet_address, wallet_network")
+          .eq("id", user.id)
+          .maybeSingle();
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("wallet_address, wallet_network")
-        .eq("id", user.id)
-        .maybeSingle();
+        if (profile?.wallet_address) {
+          setWalletAddress(profile.wallet_address);
+        }
 
-      if (data?.wallet_address) {
-        setWalletAddress(data.wallet_address);
+        if (profile?.wallet_network) {
+          setWalletNetwork(profile.wallet_network);
+        }
       }
 
-      if (data?.wallet_network) {
-        setWalletNetwork(data.wallet_network);
+      const { data: methods, error } = await supabase
+        .from("payment_methods")
+        .select(
+          "id, name, type, asset, network, wallet_address, payment_details, instructions, min_amount, max_amount, confirmation_required, is_active, display_order"
+        )
+        .eq("is_active", true)
+        .eq("type", "crypto")
+        .order("display_order", { ascending: true });
+
+      if (!error && methods) {
+        const usableMethods = methods.filter(
+          (method) => method.wallet_address
+        ) as PaymentMethod[];
+
+        setPaymentMethods(usableMethods);
+
+        if (usableMethods.length > 0) {
+          setSelectedMethod(usableMethods[0]);
+        }
+      }
+
+      setLoadingMethods(false);
+    }
+
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    function handleProvider(event: Event) {
+      const detail = (event as CustomEvent<Eip6963ProviderDetail>).detail;
+
+      if (!detail?.provider) return;
+
+      const name = detail.info?.name?.toLowerCase() || "";
+      const rdns = detail.info?.rdns?.toLowerCase() || "";
+
+      if (
+        name.includes("metamask") ||
+        rdns.includes("metamask")
+      ) {
+        setProvider(detail.provider);
+      } else {
+        setProvider((current) => current || detail.provider);
       }
     }
 
-    loadWallet();
+    window.addEventListener(
+      "eip6963:announceProvider",
+      handleProvider
+    );
+
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+
+    if (window.ethereum) {
+      setProvider(window.ethereum);
+    }
+
+    return () => {
+      window.removeEventListener(
+        "eip6963:announceProvider",
+        handleProvider
+      );
+    };
   }, []);
 
   async function connectWallet() {
     setMessage("");
 
-    if (!window.ethereum) {
+    const activeProvider = provider || window.ethereum;
+
+    if (!activeProvider) {
       setMessage(
-        "No compatible browser wallet was detected. Open B-Rock inside your wallet app or install a compatible wallet."
+        "MetaMask was not detected. Open B-Rock in the MetaMask mobile browser, or open the site in a browser with MetaMask installed."
       );
       return;
     }
@@ -160,7 +159,7 @@ export default function WalletDepositSection() {
     try {
       setConnecting(true);
 
-      const accounts = (await window.ethereum.request({
+      const accounts = (await activeProvider.request({
         method: "eth_requestAccounts",
       })) as string[];
 
@@ -170,7 +169,7 @@ export default function WalletDepositSection() {
         throw new Error("No wallet address was returned.");
       }
 
-      const chainId = (await window.ethereum.request({
+      const chainId = (await activeProvider.request({
         method: "eth_chainId",
       })) as string;
 
@@ -250,61 +249,38 @@ export default function WalletDepositSection() {
   }
 
   async function copyAddress() {
-    await navigator.clipboard.writeText(selectedCrypto.address);
-    setMessage("Receiving address copied.");
+    if (!selectedMethod?.wallet_address) return;
+
+    await navigator.clipboard.writeText(
+      selectedMethod.wallet_address
+    );
+
+    setMessage("B-Rock receiving address copied.");
   }
 
   return (
     <section className="mt-10 space-y-6">
       <div className="rounded-3xl border border-yellow-400/20 bg-gradient-to-br from-yellow-400/10 via-white/5 to-transparent p-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-yellow-400">
-            On-chain wallet
-          </p>
+        <p className="text-sm font-semibold uppercase tracking-widest text-yellow-400">
+          On-chain wallet
+        </p>
 
-          <h2 className="mt-2 text-2xl font-bold">
-            Connect Wallet
-          </h2>
+        <h2 className="mt-2 text-2xl font-bold">
+          Connect Your Wallet
+        </h2>
 
-          <p className="mt-2 text-sm text-white/50">
-            Connect a compatible crypto wallet to use your wallet
-            with B-Rock.
-          </p>
-        </div>
+        <p className="mt-2 text-sm text-white/50">
+          Connect your own crypto wallet to B-Rock. Your wallet
+          remains your wallet; B-Rock uses the connected address
+          as the sending wallet for supported on-chain deposits.
+        </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {wallets.map((wallet) => (
-            <button
-              key={wallet}
-              type="button"
-              onClick={connectWallet}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-yellow-400/40 hover:bg-white/10"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-sm font-bold text-yellow-400">
-                {wallet
-                  .split(" ")
-                  .map((word) => word[0])
-                  .join("")
-                  .slice(0, 2)}
-              </div>
-
-              <p className="mt-3 text-sm font-semibold">
-                {wallet}
-              </p>
-
-              <p className="mt-1 text-xs text-white/40">
-                Connect
-              </p>
-            </button>
-          ))}
-        </div>
-
-        {walletAddress && (
+        {walletAddress ? (
           <div className="mt-6 rounded-2xl border border-green-400/20 bg-green-400/5 p-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wider text-green-400">
-                  Connected
+                  Wallet Connected
                 </p>
 
                 <p className="mt-1 break-all font-mono text-sm text-white">
@@ -325,15 +301,7 @@ export default function WalletDepositSection() {
               </button>
             </div>
           </div>
-        )}
-
-        {message && (
-          <p className="mt-4 text-sm text-white/60">
-            {message}
-          </p>
-        )}
-
-        {!walletAddress && (
+        ) : (
           <button
             type="button"
             onClick={connectWallet}
@@ -342,6 +310,12 @@ export default function WalletDepositSection() {
           >
             {connecting ? "Connecting..." : "Connect Wallet"}
           </button>
+        )}
+
+        {message && (
+          <p className="mt-4 text-sm text-white/60">
+            {message}
+          </p>
         )}
       </div>
 
@@ -358,61 +332,92 @@ export default function WalletDepositSection() {
           Select the cryptocurrency and network you intend to use.
         </p>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cryptoOptions.map((crypto) => (
-            <button
-              key={crypto.id}
-              type="button"
-              onClick={() => setSelectedCrypto(crypto)}
-              className={`rounded-2xl border p-4 text-left transition ${
-                selectedCrypto.id === crypto.id
-                  ? "border-yellow-400 bg-yellow-400/10"
-                  : "border-white/10 bg-white/5 hover:bg-white/10"
-              }`}
-            >
-              <p className="font-semibold">
-                {crypto.name}
-              </p>
+        {loadingMethods && (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/50 p-5 text-sm text-white/50">
+            Loading available crypto deposit methods...
+          </div>
+        )}
 
-              <p className="mt-1 text-xs text-white/40">
-                {crypto.symbol} · {crypto.network}
-              </p>
-            </button>
-          ))}
-        </div>
+        {!loadingMethods && paymentMethods.length === 0 && (
+          <div className="mt-6 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-5 text-sm text-yellow-300">
+            No cryptocurrency deposit method is currently available.
+            Please contact support.
+          </div>
+        )}
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/70 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">
-                Receiving address
-              </p>
+        {paymentMethods.length > 0 && (
+          <>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {paymentMethods.map((method) => (
+                <button
+                  key={method.id}
+                  type="button"
+                  onClick={() => setSelectedMethod(method)}
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    selectedMethod?.id === method.id
+                      ? "border-yellow-400 bg-yellow-400/10"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    {method.name}
+                  </p>
 
-              <p className="mt-1 text-xs text-white/40">
-                {selectedCrypto.name} · {selectedCrypto.network}
-              </p>
+                  <p className="mt-1 text-xs text-white/40">
+                    {method.asset || "Crypto"}
+                    {method.network
+                      ? ` · ${method.network}`
+                      : ""}
+                  </p>
+                </button>
+              ))}
             </div>
 
-            <button
-              type="button"
-              onClick={copyAddress}
-              className="rounded-lg border border-yellow-400/30 px-3 py-2 text-xs font-semibold text-yellow-400 hover:bg-yellow-400/10"
-            >
-              Copy
-            </button>
-          </div>
+            {selectedMethod && (
+              <div className="mt-6 rounded-2xl border border-yellow-400/20 bg-slate-950/70 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">
+                      B-Rock Receiving Address
+                    </p>
 
-          <p className="mt-4 break-all rounded-xl bg-white/5 p-4 font-mono text-xs leading-6 text-white/80">
-            {selectedCrypto.address}
-          </p>
+                    <p className="mt-1 text-xs text-white/40">
+                      {selectedMethod.asset || "Crypto"}
+                      {selectedMethod.network
+                        ? ` · ${selectedMethod.network}`
+                        : ""}
+                    </p>
+                  </div>
 
-          <p className="mt-4 text-xs leading-5 text-yellow-400/80">
-            Send only {selectedCrypto.symbol} using the
-            {selectedCrypto.network} network to this address.
-            Sending an unsupported asset or network may result in
-            permanent loss of funds.
-          </p>
-        </div>
+                  <button
+                    type="button"
+                    onClick={copyAddress}
+                    className="rounded-lg border border-yellow-400/30 px-3 py-2 text-xs font-semibold text-yellow-400 hover:bg-yellow-400/10"
+                  >
+                    Copy
+                  </button>
+                </div>
+
+                <p className="mt-4 break-all rounded-xl bg-white/5 p-4 font-mono text-xs leading-6 text-white/80">
+                  {selectedMethod.wallet_address}
+                </p>
+
+                {selectedMethod.instructions && (
+                  <div className="mt-4 rounded-xl bg-white/5 p-4 text-sm leading-6 text-white/60">
+                    {selectedMethod.instructions}
+                  </div>
+                )}
+
+                <p className="mt-4 text-xs leading-5 text-yellow-400/80">
+                  Send only the selected asset using the selected
+                  network to this B-Rock receiving address. Sending
+                  an unsupported asset or network may result in
+                  permanent loss of funds.
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -425,7 +430,10 @@ export default function WalletDepositSection() {
         </h2>
 
         <div className="mt-4 min-h-20 rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-white/40">
-          Your account note will appear here.
+          Your connected wallet is your personal sending wallet.
+          The receiving address shown above is controlled by B-Rock
+          through the active payment method configured by an
+          administrator.
         </div>
       </div>
     </section>
