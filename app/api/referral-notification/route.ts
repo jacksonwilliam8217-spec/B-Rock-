@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Email notifications are not configured." },
+        { status: 503 }
+      );
+    }
+
+    const resend = new Resend(apiKey);
     const body = await request.json();
 
     const {
