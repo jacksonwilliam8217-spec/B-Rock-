@@ -1,8 +1,6 @@
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 function isValidEmail(email: unknown): email is string {
   if (typeof email !== "string") return false;
 
@@ -176,6 +174,7 @@ export async function notifyInvestmentCompleted(
     process.env.RESEND_API_KEY &&
     process.env.RESEND_FROM_EMAIL
   ) {
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const { error: emailError } = await resend.emails.send({
       from: `B-Rock <${process.env.RESEND_FROM_EMAIL}>`,
       to: [profile.email.trim()],
