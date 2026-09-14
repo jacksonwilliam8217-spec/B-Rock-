@@ -76,23 +76,17 @@ function getTokenContract(asset: string) {
 function getTokenDecimals(asset: string) {
   return TOKEN_DECIMALS[asset.toUpperCase()] ?? 18;
 }
-
 function formatTokenAmount(rawValue: string, decimals: number) {
   const value = BigInt(rawValue);
-  const divisor = 10n ** BigInt(decimals);
+  const divisor = BigInt(10) ** BigInt(decimals);
   const whole = value / divisor;
   const fraction = value % divisor;
 
-  if (fraction === 0n) {
+  if (fraction === BigInt(0)) {
     return Number(whole);
   }
 
-  const fractionText = fraction
-    .toString()
-    .padStart(decimals, "0")
-    .replace(/0+$/, "");
-
-  return Number(`${whole}.${fractionText}`);
+  return Number(whole) + Number(fraction) / Number(divisor);
 }
 
 export async function POST(request: Request) {
