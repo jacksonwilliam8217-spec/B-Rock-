@@ -67,24 +67,22 @@ import { createClient } from "@/lib/supabase/client";
       return;
     }
 
-    const { data: existingUsername, error: usernameCheckError } =
-      await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", username)
-        .maybeSingle();
+const { data: usernameAvailable, error: usernameCheckError } =
+  await supabase.rpc("is_username_available", {
+    p_username: username,
+  });
 
-    if (usernameCheckError) {
-      setMessage("Unable to check username availability.");
-      setLoading(false);
-      return;
-    }
+if (usernameCheckError) {
+  setMessage("Unable to check username availability.");
+  setLoading(false);
+  return;
+}
 
-    if (existingUsername) {
-      setMessage("That username is already taken.");
-      setLoading(false);
-      return;
-    }
+if (!usernameAvailable) {
+  setMessage("That username is already taken.");
+  setLoading(false);
+  return;
+}
 
     const { data, error } = await supabase.auth.signUp({
       email,
